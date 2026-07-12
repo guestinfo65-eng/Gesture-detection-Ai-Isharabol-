@@ -1,0 +1,1186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IshaaraBol — Sign to Speech</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;700;800&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F5F7F2;
+    --card:#FFFFFF;
+    --ink:#1F2D27;
+    --ink-soft:#5B6B63;
+    --teal:#2F8F7B;
+    --coral:#E4572E;
+    --gold:#F2A93B;
+    --blue:#3D7EBF;
+    --blush:#D65A82;
+    --ring-idle:#C9D3CC;
+    --font-display:'Nunito',system-ui,sans-serif;
+    --font-body:'Inter',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--font-body);}
+  h1,h2,h3{font-family:var(--font-display);margin:0;}
+
+  .app{max-width:1100px;margin:0 auto;padding:24px 20px 60px;}
+
+  header.top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:22px;flex-wrap:wrap;}
+  header.top h1{font-size:1.7rem;font-weight:800;color:var(--ink);}
+  header.top .sub{color:var(--ink-soft);font-size:0.92rem;margin-top:2px;}
+  .brand{display:flex;flex-direction:column;}
+
+  .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  .btn{
+    font-family:var(--font-display);font-weight:700;font-size:0.9rem;
+    border:none;border-radius:999px;padding:10px 18px;cursor:pointer;
+    background:var(--teal);color:white;transition:transform .12s ease, opacity .12s ease;
+  }
+  .btn:hover{transform:translateY(-1px);}
+  .btn:active{transform:translateY(0);}
+  .btn.secondary{background:white;color:var(--ink);border:2px solid var(--ring-idle);}
+  .btn:disabled{opacity:0.5;cursor:not-allowed;}
+  select{
+    font-family:var(--font-body);border-radius:999px;padding:9px 14px;border:2px solid var(--ring-idle);
+    background:white;color:var(--ink);font-size:0.85rem;
+  }
+
+  .layout{display:grid;grid-template-columns:1.3fr 1fr;gap:24px;}
+  @media (max-width:820px){.layout{grid-template-columns:1fr;}}
+
+  .stage{position:relative;border-radius:28px;overflow:hidden;background:#000;aspect-ratio:4/3;
+    box-shadow:0 10px 30px rgba(31,45,39,0.15);}
+  video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);}
+  canvas.overlay{position:absolute;inset:0;width:100%;height:100%;transform:scaleX(-1);}
+
+  .status-ring{position:absolute;top:16px;left:16px;right:16px;display:flex;align-items:center;gap:10px;
+    background:rgba(255,255,255,0.9);backdrop-filter:blur(6px);border-radius:999px;padding:8px 14px;
+    font-family:var(--font-display);font-weight:700;font-size:0.85rem;color:var(--ink);}
+  .status-dot{width:10px;height:10px;border-radius:50%;background:var(--ring-idle);transition:background .15s ease, transform .15s ease;}
+  .status-dot.live{background:var(--teal);animation:pulse 1.4s infinite;}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(47,143,123,0.5);}70%{box-shadow:0 0 0 10px rgba(47,143,123,0);}100%{box-shadow:0 0 0 0 rgba(47,143,123,0);}}
+
+  .caption-bar{position:absolute;left:16px;right:16px;bottom:16px;background:rgba(0,0,0,0.72);color:white;
+    border-radius:16px;padding:12px 16px;font-family:var(--font-display);font-weight:700;font-size:1.05rem;
+    min-height:24px;text-align:center;}
+  .caption-bar.empty{opacity:0.5;font-weight:600;font-size:0.9rem;}
+
+  .board{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-content:start;}
+  .card{
+    background:var(--card);border-radius:20px;padding:16px 14px;text-align:center;
+    box-shadow:0 4px 14px rgba(31,45,39,0.06);border:3px solid transparent;transition:all .15s ease;
+  }
+  .card .icon{font-size:2.1rem;line-height:1;margin-bottom:6px;}
+  .card .label-en{font-family:var(--font-display);font-weight:800;font-size:1rem;}
+  .card .label-ur{color:var(--ink-soft);font-size:0.82rem;margin-top:2px;}
+  .card.active{transform:scale(1.05);}
+
+  .card.yes.active{border-color:var(--gold);background:#FFF6E4;}
+  .card.no.active{border-color:var(--coral);background:#FDEDE7;}
+  .card.water.active{border-color:var(--blue);background:#E8F1FA;}
+  .card.hungry.active{border-color:var(--teal);background:#E6F4F0;}
+  .card.kiss.active{border-color:var(--blush);background:#FBEAF0;}
+
+  .panel{grid-column:1/-1;background:var(--card);border-radius:20px;padding:16px 18px;box-shadow:0 4px 14px rgba(31,45,39,0.06);}
+  .panel h3{font-size:0.95rem;margin-bottom:8px;}
+  .panel .row{display:flex;justify-content:space-between;align-items:center;font-size:0.85rem;color:var(--ink-soft);padding:6px 0;border-bottom:1px dashed var(--ring-idle);}
+  .panel .row:last-child{border-bottom:none;}
+  .panel input[type=range]{width:140px;accent-color:var(--teal);}
+
+  .hint{font-size:0.82rem;color:var(--ink-soft);margin-top:10px;line-height:1.5;}
+  .guide-box{margin-top:10px;padding:10px 12px;border-radius:12px;background:#F4FAF8;border:1px solid #DDECE7;color:var(--ink-soft);font-size:0.8rem;line-height:1.45;}
+  .guide-box strong{color:var(--teal);}
+
+  .emergency-card{margin-top:12px;padding:12px;border-radius:14px;background:#FDECEC;border:2px solid var(--coral);}
+  .emergency-card .title{font-family:var(--font-display);font-weight:800;color:var(--coral);font-size:0.92rem;}
+  .emergency-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+  .emergency-history{display:flex;flex-direction:column;gap:8px;margin-top:10px;max-height:120px;overflow:auto;}
+  .emergency-item{font-size:0.78rem;padding:8px 10px;border-radius:10px;background:#FFF7F7;color:var(--ink-soft);}
+
+  .quick-phrases{display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:8px;margin-top:10px;} 
+  .quick-phrase-btn{padding:8px 10px;border-radius:12px;border:2px solid var(--ring-idle);background:white;color:var(--ink);font-family:var(--font-body);font-size:0.8rem;font-weight:700;cursor:pointer;text-align:left;} 
+  .quick-phrase-btn:hover{border-color:var(--teal);color:var(--teal);} 
+  .phrase-history{display:flex;flex-direction:column;gap:8px;margin-top:10px;max-height:110px;overflow:auto;} 
+  .phrase-item{font-size:0.78rem;padding:8px 10px;border-radius:10px;background:#F4FAF8;color:var(--ink-soft);} 
+
+  .assist-overlay{display:none;position:fixed;inset:0;background:rgba(31,45,39,0.45);align-items:center;justify-content:center;z-index:100;padding:16px;}
+  .assist-overlay.open{display:flex;}
+  .assist-modal{
+    background:var(--card);border-radius:22px;width:100%;max-width:440px;max-height:82vh;
+    display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(31,45,39,0.3);overflow:hidden;
+  }
+  .assist-head{
+    display:flex;align-items:center;justify-content:space-between;padding:14px 18px;
+    background:var(--teal);color:white;
+  }
+  .assist-head h3{font-size:1rem;}
+  .assist-head .assist-sub{font-size:0.72rem;opacity:0.85;font-family:var(--font-body);margin-top:2px;}
+  .assist-close{background:none;border:none;color:white;font-size:1.3rem;cursor:pointer;line-height:1;padding:2px 6px;}
+
+  .assist-chips{display:flex;flex-wrap:wrap;gap:8px;padding:10px 18px;border-top:1px solid var(--ring-idle);background:var(--bg);}
+  .chip{
+    font-family:var(--font-body);font-size:0.78rem;font-weight:600;color:var(--ink);
+    background:white;border:2px solid var(--ring-idle);border-radius:999px;padding:6px 12px;cursor:pointer;
+    transition:all .12s ease;
+  }
+  .chip:hover{border-color:var(--teal);color:var(--teal);}
+
+  .assist-messages{flex:1;overflow-y:auto;padding:14px 18px;display:flex;flex-direction:column;gap:10px;background:var(--bg);min-height:180px;}
+  .msg{max-width:85%;padding:9px 13px;border-radius:14px;font-size:0.88rem;line-height:1.45;white-space:pre-wrap;}
+  .msg.user{align-self:flex-end;background:var(--teal);color:white;border-bottom-right-radius:4px;}
+  .msg.bot{align-self:flex-start;background:white;color:var(--ink);border-bottom-left-radius:4px;box-shadow:0 2px 8px rgba(31,45,39,0.08);}
+  .msg.system{align-self:center;background:none;color:var(--ink-soft);font-size:0.76rem;text-align:center;}
+
+  .assist-input-row{display:flex;gap:8px;padding:12px 14px;border-top:1px solid var(--ring-idle);background:var(--card);}
+  .assist-input-row textarea{
+    flex:1;resize:none;border:2px solid var(--ring-idle);border-radius:14px;padding:9px 12px;
+    font-family:var(--font-body);font-size:0.88rem;max-height:80px;
+  }
+  .assist-input-row button{white-space:nowrap;}
+  .assist-forget{background:none;border:none;color:var(--coral);font-size:0.72rem;cursor:pointer;text-decoration:underline;padding:0;align-self:flex-start;}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="top">
+    <div class="brand">
+      <h1>IshaaraBol</h1>
+      <div class="sub">Sign to Speech — for those who can't speak</div>
+    </div>
+    <div class="controls">
+      <select id="voice-lang">
+        <option value="ur-PK">Urdu voice (if available)</option>
+        <option value="en-US" selected>English voice</option>
+      </select>
+      <button id="mute-btn" class="btn secondary">Sound: On</button>
+      <button id="start-btn" class="btn">Start Camera</button>
+      <button id="assistant-btn" class="btn secondary">AI Assistant</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <div class="stage" id="stage">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="overlay" class="overlay"></canvas>
+      <div class="status-ring">
+        <span class="status-dot" id="status-dot"></span>
+        <span id="status-text">Camera off — press Start</span>
+      </div>
+      <div class="caption-bar empty" id="caption-bar">Waiting for a sign…</div>
+      <div class="guide-box" style="position:absolute;left:16px;right:16px;top:54px;z-index:5;">
+        <strong>Quick start:</strong> Press Start Camera, allow access, then make a simple sign like YES, NO, or help. The app will speak it out loud.
+      </div>
+    </div>
+
+    <div class="board">
+      <div class="card yes" id="card-yes"><div class="icon">🙆</div><div class="label-en">YES</div><div class="label-ur">Head nod for yes</div></div>
+      <div class="card no" id="card-no"><div class="icon">🙅</div><div class="label-en">NO</div><div class="label-ur">Head shake for no</div></div>
+      <div class="card water" id="card-water"><div class="icon">💧</div><div class="label-en">WATER</div><div class="label-ur">Thumbs-up near the mouth</div></div>
+      <div class="card hungry" id="card-hungry"><div class="icon">🍽️</div><div class="label-en">HUNGRY</div><div class="label-ur">Pinched fingers near the mouth</div></div>
+
+      <div class="card kiss" id="card-kiss" style="grid-column:1/-1;"><div class="icon">😘</div><div class="label-en">KISS / LOVE</div><div class="label-ur">Hand near puckered lips</div></div>
+
+      <div class="panel">
+        <h3>My Signs — teach your own sign</h3>
+        <p class="hint">You can add your favorite hand sign easily. Type a name, create the pose, and press Record.</p>
+        <div class="row" style="flex-wrap:wrap;gap:8px;">
+          <input id="mysign-name-en" type="text" placeholder="Name (English), e.g. Bathroom" style="flex:1;min-width:140px;border-radius:999px;border:2px solid var(--ring-idle);padding:8px 12px;font-family:var(--font-body);">
+          <input id="mysign-name-ur" type="text" placeholder="Urdu (optional)" style="flex:1;min-width:100px;border-radius:999px;border:2px solid var(--ring-idle);padding:8px 12px;font-family:var(--font-body);">
+        </div>
+        <div class="row" style="margin-top:8px;">
+          <button id="mysign-record-btn" class="btn secondary" style="width:100%;">Record sign (2-second hold)</button>
+        </div>
+        <p class="hint" id="mysign-status" style="min-height:18px;"></p>
+        <div id="mysign-list" style="max-height:200px;overflow-y:auto;margin-top:6px;"></div>
+        <p class="hint" id="mysign-count">0 / 100 saved</p>
+      </div>
+
+      <div class="panel">
+        <h3>Built-in Gestures</h3>
+        <p class="hint">This app already understands core signs, and you can also add your own custom signs for demos and daily use.</p>
+      </div>
+
+      <div class="panel">
+        <h3>Emergency Assist</h3>
+        <p class="hint">If a user shows a help sign, the app sends a clear alert and help message so a caregiver can respond quickly.</p>
+        <div class="emergency-card">
+          <div class="title" id="emergency-status">No help alert yet.</div>
+          <div class="emergency-actions">
+            <button id="emergency-copy-btn" class="btn secondary" style="padding:8px 12px;">Copy help message</button>
+            <button id="emergency-demo-btn" class="btn secondary" style="padding:8px 12px;">Try demo alert</button>
+          </div>
+          <div id="emergency-history" class="emergency-history"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Quick Phrases</h3>
+        <p class="hint">These buttons help you quickly speak common requests such as help, water, hunger, or thank you.</p>
+        <div class="quick-phrases">
+          <button class="quick-phrase-btn" data-phrase="help">I need help</button>
+          <button class="quick-phrase-btn" data-phrase="water">I need water</button>
+          <button class="quick-phrase-btn" data-phrase="hungry">I am hungry</button>
+          <button class="quick-phrase-btn" data-phrase="restroom">I need restroom</button>
+          <button class="quick-phrase-btn" data-phrase="tired">I am tired</button>
+          <button class="quick-phrase-btn" data-phrase="thankyou">Thank you</button>
+        </div>
+        <div id="phrase-history" class="phrase-history"></div>
+      </div>
+
+      <div class="panel">
+        <h3>Sensitivity</h3>
+        <div class="row"><span>Gesture hold time</span><input type="range" id="hold-slider" min="200" max="1200" value="500"><span id="hold-val">500ms</span></div>
+        <div class="row"><span>Detection confidence</span><input type="range" id="conf-slider" min="0.3" max="0.9" step="0.05" value="0.55"><span id="conf-val">0.55</span></div>
+        <p class="hint">If gestures trigger too easily, raise these. If nothing triggers, lower them. Tune while testing in real lighting.</p>
+      </div>
+    </div>
+  </div>
+
+  <footer class="note">
+    Runs fully in your browser — video never leaves your device. Needs a webcam and a modern browser (Chrome/Edge recommended).<br>
+    First load downloads ~15MB of AI models from Google's MediaPipe CDN — needs internet once, then it's cached.
+  </footer>
+
+  <!-- ---------- AI Assistant Modal (Groq AI, offline fallback) ---------- -->
+  <div class="assist-overlay" id="assist-overlay">
+    <div class="assist-modal">
+      <div class="assist-head">
+        <div>
+          <h3>Help Assistant</h3>
+          <div class="assist-sub">Powered by Fireworks AI — offline fallback available</div>
+        </div>
+        <button class="assist-close" id="assist-close" aria-label="Close">✕</button>
+      </div>
+
+      <div class="assist-messages" id="assist-messages">
+        <div class="msg bot">Hello! I am IshaaraBol's AI help assistant 🙂 Ask me about the gestures, camera setup, sensitivity, or voice output. You can also use the quick buttons below.</div>
+      </div>
+
+      <div class="assist-chips" id="assist-chips">
+        <button class="chip" id="assist-test-conn" data-testconn="1">Test AI connection</button>
+        <button class="chip" data-q="list all gestures">List all gestures</button>
+        <button class="chip" data-q="camera is not working">Camera not working</button>
+        <button class="chip" data-q="how do I adjust sensitivity">Sensitivity</button>
+        <button class="chip" data-q="there is no voice output">No voice output</button>
+      </div>
+
+      <div class="assist-input-row">
+        <textarea id="assist-input" rows="1" placeholder="Type your question here..."></textarea>
+        <button class="btn" id="assist-send">Send</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  
+import { FilesetResolver, FaceLandmarker, HandLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+
+const video = document.getElementById("video");
+const overlay = document.getElementById("overlay");
+const ctx = overlay.getContext("2d");
+const statusDot = document.getElementById("status-dot");
+const statusText = document.getElementById("status-text");
+const captionBar = document.getElementById("caption-bar");
+const startBtn = document.getElementById("start-btn");
+const muteBtn = document.getElementById("mute-btn");
+const voiceLangSel = document.getElementById("voice-lang");
+const holdSlider = document.getElementById("hold-slider");
+const holdVal = document.getElementById("hold-val");
+const confSlider = document.getElementById("conf-slider");
+const confVal = document.getElementById("conf-val");
+
+const cards = {
+  yes: document.getElementById("card-yes"),
+  no: document.getElementById("card-no"),
+  water: document.getElementById("card-water"),
+  hungry: document.getElementById("card-hungry"),
+  kiss: document.getElementById("card-kiss"),
+};
+
+const emergencyStatusEl = document.getElementById("emergency-status");
+const emergencyCopyBtn = document.getElementById("emergency-copy-btn");
+const emergencyDemoBtn = document.getElementById("emergency-demo-btn");
+const emergencyHistoryEl = document.getElementById("emergency-history");
+const phraseHistoryEl = document.getElementById("phrase-history");
+const EMERGENCY_MESSAGE = "I need help. Please assist me.";
+const QUICK_PHRASES = {
+  help: { en: "I need help.", ur: "مجھے مدد چاہیے۔", icon: "🚨" },
+  water: { en: "I need water.", ur: "مجھے پانی چاہیے۔", icon: "💧" },
+  hungry: { en: "I am hungry.", ur: "مجھے بھوک لگی ہے۔", icon: "🍽️" },
+  restroom: { en: "I need the restroom.", ur: "مجھے غسل خانہ چاہیے۔", icon: "🚻" },
+  tired: { en: "I am tired.", ur: "میں تھکا ہوا ہوں۔", icon: "😴" },
+  thankyou: { en: "Thank you.", ur: "شکریہ۔", icon: "🙏" },
+};
+let emergencyEvents = [];
+let phraseHistory = [];
+
+function renderEmergencyHistory() {
+  if (!emergencyHistoryEl) return;
+  if (!emergencyEvents.length) {
+    emergencyHistoryEl.innerHTML = '<div class="emergency-item">No alerts yet.</div>';
+    return;
+  }
+  emergencyHistoryEl.innerHTML = emergencyEvents.map(ev => `<div class="emergency-item">${ev.time} • ${ev.detail}</div>`).join("");
+}
+
+function loadPhraseHistory() {
+  try {
+    const saved = localStorage.getItem("ishaarabol-phrase-history");
+    phraseHistory = saved ? JSON.parse(saved) : [];
+  } catch (err) {
+    phraseHistory = [];
+  }
+  renderPhraseHistory();
+}
+
+function savePhraseHistory() {
+  localStorage.setItem("ishaarabol-phrase-history", JSON.stringify(phraseHistory.slice(0, 8)));
+}
+
+function renderPhraseHistory() {
+  if (!phraseHistoryEl) return;
+  if (!phraseHistory.length) {
+    phraseHistoryEl.innerHTML = '<div class="phrase-item">No quick phrases used yet.</div>';
+    return;
+  }
+  phraseHistoryEl.innerHTML = phraseHistory.map(entry => `<div class="phrase-item">${entry.time} • ${entry.text}</div>`).join("");
+}
+
+function triggerQuickPhrase(key) {
+  const item = QUICK_PHRASES[key];
+  if (!item) return;
+  const text = voiceLangSel.value.startsWith("ur") ? item.ur : item.en;
+  captionBar.textContent = `${item.icon} ${text}`;
+  captionBar.classList.remove("empty");
+  speak(text);
+  const stamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  phraseHistory.unshift({ time: stamp, text });
+  phraseHistory = phraseHistory.slice(0, 8);
+  savePhraseHistory();
+  renderPhraseHistory();
+}
+
+async function triggerEmergencyAlert(source = "gesture", detail = "Help sign detected") {
+  const stamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  emergencyStatusEl.textContent = `🚨 Help alert triggered at ${stamp}`;
+  emergencyEvents.unshift({ time: stamp, detail });
+  emergencyEvents = emergencyEvents.slice(0, 5);
+  renderEmergencyHistory();
+  captionBar.textContent = `🚨 ${EMERGENCY_MESSAGE}`;
+  captionBar.classList.remove("empty");
+  speak("I need help");
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(`${EMERGENCY_MESSAGE} (${detail})`);
+    }
+  } catch (err) {
+    console.warn("Clipboard not available:", err);
+  }
+}
+
+let muted = false;
+if (muteBtn) {
+  muteBtn.addEventListener("click", () => {
+    muted = !muted;
+    muteBtn.textContent = muted ? "🔇 Sound: Off" : "🔊 Sound: On";
+  });
+}
+
+if (holdSlider && holdVal) {
+  holdSlider.addEventListener("input", () => holdVal.textContent = holdSlider.value + "ms");
+}
+if (confSlider && confVal) {
+  confSlider.addEventListener("input", () => confVal.textContent = confSlider.value);
+}
+
+let HOLD_MS = Number(holdSlider?.value || 500);
+let CONF = Number(confSlider?.value || 0.55);
+if (holdSlider) holdSlider.addEventListener("change", () => HOLD_MS = Number(holdSlider.value));
+if (confSlider) confSlider.addEventListener("change", () => CONF = Number(confSlider.value));
+
+// ---------- Speech ----------
+function speak(text) {
+  if (muted || !text) return;
+  if (!("speechSynthesis" in window)) return;
+  try {
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = voiceLangSel?.value || "en-US";
+    u.rate = 0.95;
+    window.speechSynthesis.speak(u);
+  } catch (err) {
+    console.warn("Speech unavailable:", err);
+  }
+}
+
+const PHRASES = {
+  yes: { en: "Yes.", ur: "ہاں", cardKey: "yes" },
+  no: { en: "No.", ur: "نہیں", cardKey: "no" },
+  water: { en: "I want water.", ur: "مجھے پانی چاہیے", cardKey: "water" },
+  hungry: { en: "I am hungry.", ur: "مجھے بھوک لگی ہے", cardKey: "hungry" },
+  kiss: { en: "Sending a kiss.", ur: "پیار بھیج رہا ہوں", cardKey: "kiss" },
+};
+
+const TWO_HAND_LIBRARY = {
+  thankyou: { en: "Thank you.", ur: "شکریہ", icon: "🙏" },
+  help:     { en: "I need help!", ur: "مجھے مدد چاہیے", icon: "🆘" },
+  stop:     { en: "Stop, please.", ur: "رک جائیں", icon: "✋" },
+};
+
+function announce(key) {
+  if (!key) return;
+  // Two-hand combo gesture, e.g. "two:thankyou"
+  if (key.startsWith("two:")) {
+    const item = TWO_HAND_LIBRARY[key.slice(4)];
+    if (!item) return;
+    captionBar.textContent = `${item.icon} ${item.en}   (${item.ur})`;
+    captionBar.classList.remove("empty");
+    speak(voiceLangSel.value.startsWith("ur") ? item.ur : item.en);
+    return;
+  }
+  // Custom sign the user recorded themselves, e.g. "custom:g1720000000000"
+  if (key.startsWith("custom:")) {
+    const g = customGestures.find(c => c.id === key.slice(7));
+    if (!g) return;
+    captionBar.textContent = `${g.icon} ${g.name_en}${g.name_ur ? "   (" + g.name_ur + ")" : ""}`;
+    captionBar.classList.remove("empty");
+    speak(voiceLangSel.value.startsWith("ur") && g.name_ur ? g.name_ur : g.name_en);
+    return;
+  }
+  const p = PHRASES[key];
+  if (!p) return;
+  Object.values(cards).forEach(c => c?.classList.remove("active"));
+  cards[p.cardKey]?.classList.add("active");
+  captionBar.textContent = `${p.en}   (${p.ur})`;
+  captionBar.classList.remove("empty");
+  speak(voiceLangSel?.value?.startsWith("ur") ? p.ur : p.en);
+  setTimeout(() => cards[p.cardKey]?.classList.remove("active"), 900);
+}
+
+// ---------- Landmark helpers ----------
+function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y, (a.z||0) - (b.z||0)); }
+
+function mouthCenter(face) {
+  const top = face[13], bottom = face[14], left = face[61], right = face[291];
+  return {
+    x: (top.x + bottom.x + left.x + right.x) / 4,
+    y: (top.y + bottom.y + left.y + right.y) / 4,
+    z: ((top.z||0) + (bottom.z||0)) / 2,
+  };
+}
+
+function faceScale(face) {
+  // rough face width, used to normalize distances so it works at any camera distance
+  return dist(face[234], face[454]) || 0.25;
+}
+
+// =====================================================================
+// ---------- Custom Sign Trainer ("My Signs") ----------
+// Instead of a fixed library, the person records their own hand pose,
+// gives it a name, and the app remembers it (saved server-side via
+// server.py, so it survives restarts). Up to 100 signs.
+// =====================================================================
+
+let customGestures = []; // loaded from /api/gestures on startup
+
+// Turn a single hand's 21 landmarks into a compact, scale/position-independent
+// vector: every point relative to the wrist, divided by hand size.
+function handToVector(hand) {
+  const wrist = hand[0];
+  const handSize = dist(hand[0], hand[9]) || 0.1; // wrist -> middle-finger MCP
+  const out = [];
+  for (const p of hand) {
+    out.push((p.x - wrist.x) / handSize, (p.y - wrist.y) / handSize);
+  }
+  return out;
+}
+
+function vectorDistance(a, b) {
+  let sum = 0;
+  for (let i = 0; i < a.length; i++) sum += (a[i] - b[i]) ** 2;
+  return Math.sqrt(sum);
+}
+
+const CUSTOM_MATCH_THRESHOLD = 0.9; // lower = stricter match
+
+// Compares live hand(s) against every saved custom gesture, returns the
+// closest match under the threshold (or null).
+function classifyCustom(handsArr) {
+  if (!customGestures.length || !handsArr.length) return null;
+  const liveVec1 = handToVector(handsArr[0]);
+  let best = null, bestD = Infinity;
+  for (const g of customGestures) {
+    if (g.hands === 1) {
+      const d = vectorDistance(liveVec1, g.vector);
+      if (d < bestD) { bestD = d; best = g; }
+    } else if (g.hands === 2 && handsArr.length >= 2) {
+      const liveVec2 = handToVector(handsArr[1]);
+      const combined = liveVec1.concat(liveVec2);
+      const d1 = vectorDistance(combined, g.vector);
+      const swapped = liveVec2.concat(liveVec1); // hands can be seen in either order
+      const d2 = vectorDistance(swapped, g.vector);
+      const d = Math.min(d1, d2);
+      if (d < bestD) { bestD = d; best = g; }
+    }
+  }
+  if (best && bestD < CUSTOM_MATCH_THRESHOLD) return "custom:" + best.id;
+  return null;
+}
+
+// ---------- Head nod / shake tracker ----------
+const noseBuffer = []; // {t, x, y}
+const HEAD_WINDOW_MS = 900;
+
+
+function updateHeadTracker(face, scale) {
+  const nose = face[1];
+  const now = performance.now();
+  noseBuffer.push({ t: now, x: nose.x / scale, y: nose.y / scale });
+  while (noseBuffer.length && now - noseBuffer[0].t > HEAD_WINDOW_MS) noseBuffer.shift();
+  if (noseBuffer.length < 6) return null;
+
+  const xs = noseBuffer.map(p => p.x);
+  const ys = noseBuffer.map(p => p.y);
+  const xRange = Math.max(...xs) - Math.min(...xs);
+  const yRange = Math.max(...ys) - Math.min(...ys);
+
+  function directionChanges(arr) {
+    let changes = 0, lastSign = 0;
+    for (let i = 1; i < arr.length; i++) {
+      const d = arr[i] - arr[i - 1];
+      const sign = d > 0.0005 ? 1 : d < -0.0005 ? -1 : 0;
+      if (sign !== 0 && lastSign !== 0 && sign !== lastSign) changes++;
+      if (sign !== 0) lastSign = sign;
+    }
+    return changes;
+  }
+
+  const MIN_RANGE = 0.06; // normalized by face width — tune if too sensitive/insensitive
+  if (yRange > xRange * 1.25 && yRange > MIN_RANGE && directionChanges(ys) >= 2) {
+    noseBuffer.length = 0;
+    return "yes";
+  }
+  if (xRange > yRange * 1.25 && xRange > MIN_RANGE && directionChanges(xs) >= 2) {
+    noseBuffer.length = 0;
+    return "no";
+  }
+  return null;
+}
+
+// ---------- Hand gesture classification ----------
+function classifyHand(hand, face, scale) {
+  if (!face) return null;
+  const wrist = hand[0];
+  const thumbTip = hand[4], thumbMcp = hand[2];
+  const tips = [hand[8], hand[12], hand[16], hand[20]];
+  const mcps = [hand[5], hand[9], hand[13], hand[17]];
+  const mouth = mouthCenter(face);
+
+  const handToMouth = dist(wrist, mouth) / scale;
+  const NEAR_MOUTH = 1.1; // normalized units — hand roughly within face-width-ish distance
+
+  // how curled are the 4 fingers (excluding thumb): tip close to its own mcp => curled
+  const curl = tips.map((tip, i) => dist(tip, mcps[i]) / scale);
+  const avgCurl = curl.reduce((a, b) => a + b, 0) / curl.length;
+  const thumbExtension = dist(thumbTip, thumbMcp) / scale;
+
+  // pinch spread: how close together are all 5 fingertips
+  const allTips = [thumbTip, ...tips];
+  let maxPairDist = 0;
+  for (let i = 0; i < allTips.length; i++)
+    for (let j = i + 1; j < allTips.length; j++)
+      maxPairDist = Math.max(maxPairDist, dist(allTips[i], allTips[j]) / scale);
+
+  const thumbToMouth = dist(thumbTip, mouth) / scale;
+  const pinchCenter = { x: allTips.reduce((s,p)=>s+p.x,0)/5, y: allTips.reduce((s,p)=>s+p.y,0)/5, z:0 };
+  const pinchToMouth = dist(pinchCenter, mouth) / scale;
+
+  if (handToMouth < NEAR_MOUTH * 1.6) {
+    // thumbs-up near mouth: fingers curled, thumb clearly extended
+    if (avgCurl < 0.35 && thumbExtension > 0.45 && thumbToMouth < NEAR_MOUTH) {
+      return "water";
+    }
+    // pinched fingertips near mouth
+    if (maxPairDist < 0.28 && pinchToMouth < NEAR_MOUTH) {
+      return "hungry";
+    }
+    // open hand / fingertips resting near mouth (not pinched, not thumbs-up) => kiss gesture
+    if (maxPairDist >= 0.28 && handToMouth < NEAR_MOUTH) {
+      return "kiss";
+    }
+  }
+  return null;
+}
+
+// ---------- Two-hand combo gestures ----------
+// Only run when both hands are visible. Adds a few natural two-handed signs
+// on top of the one-hand core + library gestures above.
+function handCurlAmount(hand, scale) {
+  const tips = [hand[8], hand[12], hand[16], hand[20]];
+  const mcps = [hand[5], hand[9], hand[13], hand[17]];
+  const curls = tips.map((tip, i) => dist(tip, mcps[i]) / scale);
+  return curls.reduce((a, b) => a + b, 0) / curls.length; // low = curled/fist, high = open
+}
+
+function classifyTwoHands(handsArr, face, scale) {
+  if (!face) return null;
+  const [h1, h2] = handsArr;
+  const c1 = h1[9], c2 = h2[9]; // middle-finger MCP ~= palm center for each hand
+  const handDist = dist(c1, c2) / scale;
+  const mouth = mouthCenter(face);
+  const avgCenter = { x: (c1.x + c2.x) / 2, y: (c1.y + c2.y) / 2, z: 0 };
+  const centerToMouth = dist(avgCenter, mouth) / scale;
+
+  const curl1 = handCurlAmount(h1, scale);
+  const curl2 = handCurlAmount(h2, scale);
+  const bothOpen = curl1 > 0.5 && curl2 > 0.5;
+  const bothFists = curl1 < 0.35 && curl2 < 0.35;
+
+  // Both open palms pressed together near the mouth/chest => "thank you" (namaste-style)
+  if (bothOpen && handDist < 0.6 && centerToMouth < 1.6) {
+    return "two:thankyou";
+  }
+  // Both fists raised up near/above the face => "help / emergency"
+  if (bothFists && avgCenter.y < face[10].y + 0.08) {
+    return "two:help";
+  }
+  // Both open palms held up and apart, roughly level, at/above chin height => "stop / wait"
+  if (bothOpen && handDist > 0.9 && Math.abs(c1.y - c2.y) / scale < 0.4 && avgCenter.y < face[152].y) {
+    return "two:stop";
+  }
+  return null;
+}
+
+// mouth pucker check using simple geometry (works even without blendshapes)
+function isPuckered(face, scale) {
+  const width = dist(face[61], face[291]) / scale;
+  const openness = dist(face[13], face[14]) / scale;
+  return width < 0.55 && openness < 0.22; // narrow + not wide-open => puckered lips
+}
+
+// ---------- Gesture hold/debounce state machine ----------
+let currentGesture = null;
+let gestureStart = 0;
+let lastAnnounced = null;
+let lastAnnounceTime = 0;
+const COOLDOWN_MS = 1800;
+
+function processGesture(candidate) {
+  const now = performance.now();
+  if (candidate !== currentGesture) {
+    currentGesture = candidate;
+    gestureStart = now;
+    return;
+  }
+  if (!candidate) return;
+  const held = now - gestureStart;
+  if (held >= HOLD_MS) {
+    if (candidate !== lastAnnounced || now - lastAnnounceTime > COOLDOWN_MS) {
+      if (candidate === "two:help") {
+        triggerEmergencyAlert("gesture", "Help sign detected");
+      }
+      announce(candidate);
+      lastAnnounced = candidate;
+      lastAnnounceTime = now;
+    }
+    gestureStart = now; // require re-hold before repeating
+  }
+}
+
+// ---------- My Signs: load, render, record, delete ----------
+const mysignNameEnEl = document.getElementById("mysign-name-en");
+const mysignNameUrEl = document.getElementById("mysign-name-ur");
+const mysignRecordBtn = document.getElementById("mysign-record-btn");
+const mysignStatusEl = document.getElementById("mysign-status");
+const mysignListEl = document.getElementById("mysign-list");
+const mysignCountEl = document.getElementById("mysign-count");
+const MAX_CUSTOM_GESTURES = 100;
+
+async function readJsonResponse(res) {
+  const rawText = await res.text();
+  if (!rawText) return {};
+  try {
+    return JSON.parse(rawText);
+  } catch (err) {
+    throw new Error(rawText.slice(0, 180));
+  }
+}
+
+async function loadCustomGestures() {
+  try {
+    const res = await fetch("/api/gestures");
+    const data = await readJsonResponse(res);
+    customGestures = data.gestures || [];
+  } catch (err) {
+    console.warn("Could not load custom gestures (server offline?):", err);
+    customGestures = [];
+  }
+  renderMySignsList();
+}
+
+function renderMySignsList() {
+  if (!mysignListEl || !mysignCountEl) return;
+  mysignCountEl.textContent = `${customGestures.length} / ${MAX_CUSTOM_GESTURES} saved`;
+  if (!customGestures.length) {
+    mysignListEl.innerHTML = `<p class="hint" style="opacity:0.7;">Abhi koi custom sign save nahi hui.</p>`;
+    return;
+  }
+  mysignListEl.innerHTML = customGestures.map(g => `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px dashed var(--ring-idle);">
+      <span style="font-size:0.85rem;">${g.icon} <b>${g.name_en}</b>${g.name_ur ? " — " + g.name_ur : ""} <span style="opacity:0.6;">(${g.hands === 2 ? "2 hands" : "1 hand"})</span></span>
+      <button class="btn secondary" style="padding:4px 10px;font-size:0.75rem;" data-del="${g.id}">✕</button>
+    </div>
+  `).join("");
+  mysignListEl.querySelectorAll("[data-del]").forEach(btn => {
+    btn.addEventListener("click", () => deleteCustomGesture(btn.dataset.del));
+  });
+}
+
+async function deleteCustomGesture(id) {
+  try {
+    const res = await fetch("/api/gestures/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    const data = await readJsonResponse(res);
+    customGestures = data.gestures || customGestures.filter(g => g.id !== id);
+  } catch (err) {
+    customGestures = customGestures.filter(g => g.id !== id); // at least remove locally
+  }
+  renderMySignsList();
+}
+
+// Records the current hand pose over a short hold, averages the landmark
+// vectors, and saves the result as a new named sign.
+let recording = false;
+async function recordMySign() {
+  if (recording) return;
+  if (!mysignNameEnEl || !mysignNameUrEl || !mysignRecordBtn || !mysignStatusEl) return;
+  const nameEn = mysignNameEnEl.value.trim();
+  if (!nameEn) { mysignStatusEl.textContent = "⚠️ Pehle sign ka naam likhein."; return; }
+  if (!running) { mysignStatusEl.textContent = "⚠️ Pehle camera Start karein."; return; }
+  if (customGestures.length >= MAX_CUSTOM_GESTURES) { mysignStatusEl.textContent = "⚠️ 100 signs ki limit ho gayi — pehle kuch delete karein."; return; }
+
+  recording = true;
+  mysignRecordBtn.disabled = true;
+  const RECORD_MS = 2000;
+  const samples1 = [], samples2 = [];
+  let sawTwoHands = false;
+  mysignStatusEl.textContent = "🔴 Recording… haath ko steady rakhein.";
+
+  const startT = performance.now();
+  while (performance.now() - startT < RECORD_MS) {
+    if (lastHandsSeen && lastHandsSeen.length) {
+      samples1.push(handToVector(lastHandsSeen[0]));
+      if (lastHandsSeen.length >= 2) {
+        sawTwoHands = true;
+        samples2.push(handToVector(lastHandsSeen[1]));
+      }
+    }
+    await new Promise(r => setTimeout(r, 60));
+  }
+
+  if (samples1.length < 5) {
+    mysignStatusEl.textContent = "⚠️ Haath saaf detect nahi hua, dubara try karein.";
+    recording = false;
+    mysignRecordBtn.disabled = false;
+    return;
+  }
+
+  function average(samples) {
+    const len = samples[0].length;
+    const avg = new Array(len).fill(0);
+    for (const s of samples) for (let i = 0; i < len; i++) avg[i] += s[i] / samples.length;
+    return avg;
+  }
+
+  const useTwoHands = sawTwoHands && samples2.length >= 5;
+  const vector = useTwoHands ? average(samples1).concat(average(samples2)) : average(samples1);
+
+  try {
+    const res = await fetch("/api/gestures", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name_en: nameEn,
+        name_ur: mysignNameUrEl.value.trim(),
+        icon: "✨",
+        hands: useTwoHands ? 2 : 1,
+        vector,
+      }),
+    });
+    const data = await readJsonResponse(res);
+    if (!res.ok) throw new Error(data.error || "save failed");
+    customGestures = data.gestures || customGestures;
+    mysignStatusEl.textContent = `✅ "${nameEn}" save ho gaya!`;
+    mysignNameEnEl.value = "";
+    mysignNameUrEl.value = "";
+    renderMySignsList();
+  } catch (err) {
+    mysignStatusEl.textContent = "⚠️ Save nahi ho saka: " + err.message;
+  }
+
+  recording = false;
+  mysignRecordBtn.disabled = false;
+}
+
+if (mysignRecordBtn) mysignRecordBtn.addEventListener("click", recordMySign);
+if (emergencyCopyBtn) {
+  emergencyCopyBtn.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(EMERGENCY_MESSAGE);
+      emergencyStatusEl.textContent = "✅ Help message copied";
+    } catch (err) {
+      emergencyStatusEl.textContent = "⚠️ Clipboard unavailable";
+    }
+  });
+}
+if (emergencyDemoBtn) {
+  emergencyDemoBtn.addEventListener("click", () => triggerEmergencyAlert("demo", "Demo alert"));
+}
+renderEmergencyHistory();
+loadPhraseHistory();
+loadCustomGestures();
+
+document.querySelectorAll(".quick-phrase-btn").forEach(btn => {
+  btn.addEventListener("click", () => triggerQuickPhrase(btn.dataset.phrase));
+});
+
+// ---------- Drawing ----------
+function drawPoints(points, color) {
+  ctx.fillStyle = color;
+  for (const p of points) {
+    ctx.beginPath();
+    ctx.arc(p.x * overlay.width, p.y * overlay.height, 2.4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+// ---------- Main setup ----------
+let faceLandmarker, handLandmarker, running = false;
+let lastHandsSeen = []; // most recent detected hands, used by the "My Signs" recorder
+let lastFaceSeen = null;
+let lastFaceScale = 0.25;
+let faceLostAt = 0;
+const FACE_LOST_TIMEOUT = 1200; // ms
+
+async function setup() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    throw new Error("This browser does not support camera access.");
+  }
+  if (location.protocol === "file:") {
+    throw new Error("Please open the app through http://localhost:8080 or http://127.0.0.1:8080.");
+  }
+
+  statusText.textContent = "Loading AI models…";
+  try {
+    const filesetResolver = await FilesetResolver.forVisionTasks(
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+    );
+    faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+      baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task" },
+      runningMode: "VIDEO",
+      numFaces: 1,
+    });
+    handLandmarker = await HandLandmarker.createFromOptions(filesetResolver, {
+      baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task" },
+      runningMode: "VIDEO",
+      numHands: 2,
+    });
+  } catch (err) {
+    throw new Error("Could not load vision models. Check internet connection and try again.");
+  }
+
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: {
+      facingMode: { ideal: "user" },
+      width: { ideal: 640 },
+      height: { ideal: 480 },
+    },
+  });
+  video.srcObject = stream;
+  video.muted = true;
+  video.playsInline = true;
+  await video.play().catch(() => {
+    throw new Error("Video playback did not start. Please allow camera access and try again.");
+  });
+  await new Promise((resolve) => {
+    if (video.videoWidth && video.videoHeight) return resolve();
+    video.onloadedmetadata = () => resolve();
+  });
+  overlay.width = video.videoWidth || 640;
+  overlay.height = video.videoHeight || 480;
+
+  statusDot.classList.add("live");
+  statusText.textContent = "Watching…";
+  running = true;
+  loop();
+}
+
+function loop() {
+  if (!running || !faceLandmarker || !handLandmarker) return;
+  const now = performance.now();
+  if (!overlay || !ctx) return;
+  ctx.clearRect(0, 0, overlay.width, overlay.height);
+
+  let gesture = null;
+  let face = null, scale = 0.25;
+
+  const faceRes = faceLandmarker.detectForVideo(video, now);
+  if (faceRes.faceLandmarks && faceRes.faceLandmarks.length) {
+    face = faceRes.faceLandmarks[0];
+    scale = faceScale(face);
+    lastFaceSeen = face;
+    lastFaceScale = scale;
+    faceLostAt = now;
+    drawPoints([face[1], face[13], face[14], face[61], face[291]], "rgba(47,143,123,0.9)");
+
+    const headGesture = updateHeadTracker(face, scale);
+    if (headGesture) gesture = headGesture;
+  } else if (lastFaceSeen && now - faceLostAt < FACE_LOST_TIMEOUT) {
+    face = lastFaceSeen;
+    scale = lastFaceScale;
+  }
+
+  const handRes = handLandmarker.detectForVideo(video, now);
+  const handsArr = handRes.landmarks || [];
+  lastHandsSeen = handsArr;
+  if (handsArr.length) {
+    const HAND_COLORS = ["rgba(214,90,130,0.9)", "rgba(61,126,191,0.9)"];
+    handsArr.forEach((hand, i) => drawPoints(hand, HAND_COLORS[i % HAND_COLORS.length]));
+
+    let handGesture = null;
+    const mouthFace = face || null;
+    const mouthScale = mouthFace ? scale : 0.25;
+
+    if (handsArr.length >= 2) {
+      handGesture = classifyTwoHands(handsArr, mouthFace, mouthScale);
+    }
+
+    if (!handGesture) {
+      for (const hand of handsArr) {
+        const g = classifyHand(hand, mouthFace, mouthScale);
+        if (g === "kiss" && mouthFace && !isPuckered(mouthFace, mouthScale)) continue;
+        if (g) { handGesture = g; break; }
+      }
+    }
+
+    if (handGesture) {
+      gesture = handGesture;
+    } else {
+      const custom = classifyCustom(handsArr);
+      if (custom) gesture = custom;
+    }
+  }
+
+  processGesture(gesture);
+  requestAnimationFrame(loop);
+}
+
+// ---------- Help Assistant (Fireworks AI via local server, with offline fallback) ----------
+// NOTE: no API key here on purpose. The key lives server-side in server.py
+// (as the FIREWORKS_API_KEY environment variable) and is never sent to the browser.
+let assistHistory = [];
+
+async function askAssistant(userText) {
+  const res = await fetch("/api/assistant", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: userText, history: assistHistory }),
+  }).catch(err => { throw new Error("Server not reachable: " + err.message); });
+
+  let data = null;
+  let rawText = "";
+  try {
+    rawText = await res.text();
+    data = rawText ? JSON.parse(rawText) : {};
+  } catch (err) {
+    throw new Error(rawText ? `Invalid assistant response: ${rawText.slice(0, 160)}` : "Empty assistant response");
+  }
+
+  if (!res.ok || data.error) throw new Error(data.error || ("Assistant API error " + res.status));
+  const reply = (data.reply || "").trim();
+  if (!reply) throw new Error("Empty assistant reply");
+  assistHistory.push({ role: "user", content: userText });
+  assistHistory.push({ role: "assistant", content: reply });
+  if (assistHistory.length > 12) assistHistory = assistHistory.slice(-12); // keep context small
+  return reply;
+}
+
+const assistOverlay = document.getElementById("assist-overlay");
+const assistBtn = document.getElementById("assistant-btn");
+const assistClose = document.getElementById("assist-close");
+const assistMessages = document.getElementById("assist-messages");
+const assistInput = document.getElementById("assist-input");
+const assistSendBtn = document.getElementById("assist-send");
+const assistChips = document.getElementById("assist-chips");
+
+function addMsg(text, cls) {
+  const div = document.createElement("div");
+  div.className = "msg " + cls;
+  div.textContent = text;
+  assistMessages.appendChild(div);
+  assistMessages.scrollTop = assistMessages.scrollHeight;
+  return div;
+}
+
+assistBtn?.addEventListener("click", () => {
+  assistOverlay?.classList.add("open");
+  assistInput?.focus();
+});
+assistClose?.addEventListener("click", () => assistOverlay?.classList.remove("open"));
+assistOverlay?.addEventListener("click", (e) => { if (e.target === assistOverlay) assistOverlay.classList.remove("open"); });
+
+// Simple keyword -> answer rules. No internet, no API key, 100% free & local.
+const ASSIST_RULES = [
+  {
+    // Checked first so a general "gestures" question always gives the full list,
+    // even if it also contains a word like "yes" or "no".
+    keys: ["sab gestures", "gestures batao", "gesture list", "list of gestures", "all gestures",
+           "kitne gestures", "kya kya gesture", "kaunse gesture", "kaunse ishare", "sab ishare",
+           "ishare batao", "commands", "signs batao", "gestures", "kya kya"],
+    reply: "IshaaraBol yeh gestures samajhta hai! 🎉\n\n" +
+      "5 CORE gestures (sab se reliable):\n" +
+      "1️⃣ YES (ہاں) — Sar ko upar-neeche hilayein (nod).\n" +
+      "2️⃣ NO (نہیں) — Sar ko left-right hilayein (shake).\n" +
+      "3️⃣ WATER (پانی) — Thumbs-up banayein aur haath muh ke qareeb le jayein.\n" +
+      "4️⃣ HUNGRY (بھوک) — Sab fingers ko pinch (mila) kar muh ke paas le jayein.\n" +
+      "5️⃣ KISS / LOVE (پیار) — Haath khula rakh kar puckered lips ke paas le jayein.\n\n" +
+      "Plus 3 two-hand signs: 🙏 Thank you (dono khule haath aapas mein milakar), 🆘 Help (dono mutthi upar), ✋ Stop/Wait (dono khule haath door-door).\n\n" +
+      "Aur sab se khaas: 'My Signs' panel se aap khud apne tak 100 custom sign record kar sakte hain — jo bhi hand pose chahein, naam de kar 'Record' dabao, hamesha ke liye save ho jayega.\n\n" +
+      "Tip: Har gesture ko thora sa hold karein (default ~500ms) taake camera pakad sake — hold time 'Sensitivity' panel se adjust ho sakta hai."
+  },
+  {
+    keys: ["camera", "kaam nahi", "chal nahi", "not working", "kaam nhi", "camera nhi"],
+    reply: "Camera problem ke liye:\n1. Browser ne camera permission maangi thi — usse Allow karein (address bar ke lock/camera icon se bhi check kar sakte hain).\n2. File ko seedha double-click karke na kholein — hamesha Live Server ya run_windows.bat use karein (file:// se camera kaam nahi karta).\n3. Chrome ya Edge use karein — best support inhi mein hai.\n4. Ek waqt mein sirf ek tab/app camera use kar sakta hai — doosri app (Zoom, Teams) band kar dein."
+  },
+  {
+    keys: ["sensitivity", "hold time", "detect nahi", "bohot jaldi", "jaldi jaldi", "trigger"],
+    reply: "Sensitivity sliders screen ke right side (Sensitivity panel) mein hain:\n• Agar gesture bohot jaldi ya baar-baar trigger ho raha hai → 'Gesture hold time' ya 'Detection confidence' ko badhayein.\n• Agar kuch bhi detect nahi ho raha → dono ko halka sa kam karein.\nThori der try karke real lighting mein tune karein."
+  },
+  {
+    keys: ["yes", "haan", "sar upar", "nod"],
+    reply: "YES (ہاں): Sar ko upar-neeche (nod) hilayein — jaise normally 'haan' bolते waqt karte hain. Thora clear aur do-teen martaba hilayein taake camera pakad sake."
+  },
+  {
+    keys: ["no ", " no", "nahi", "sar left", "shake"],
+    reply: "NO (نہیں): Sar ko left-right hilayein (jaise 'na' bolte waqt). Camera ke saamne seedha baithein taake face achi tarah dikhe."
+  },
+  {
+    keys: ["water", "pani", "paani", "thumbs"],
+    reply: "WATER (پانی): Thumbs-up banayein aur haath ko muh ke qareeb le jayein — jaise pani peene ka ishara."
+  },
+  {
+    keys: ["hungry", "bhook", "bhookh", "pinch"],
+    reply: "HUNGRY (بھوک): Sab fingers ko mila kar (pinch) muh ke paas le jayein — jaise khana khane ka ishara."
+  },
+  {
+    keys: ["kiss", "pyaar", "pyar", "love", "puck"],
+    reply: "KISS/LOVE (پیار): Haath ko puckered lips (halka sa muh chhota kar ke) ke paas le jayein — hand khula hua, pinch nahi hona chahiye."
+  },
+  {
+    keys: ["awaaz", "sound", "voice", "bol nahi", "bolta nahi", "speak"],
+    reply: "Awaaz na aane ki wajah:\n1. Top-right mein 'Sound' button check karein — 'On' hona chahiye.\n2. System/browser volume check karein.\n3. Kuch browsers mein pehli baar speech chalane ke liye page par ek click zaroori hota hai — page par kahin bhi click karke phir try karein.\n4. Voice dropdown se English/Urdu switch kar ke dekhein."
+  },
+  {
+    keys: ["kis ke liye", "kya hai ye", "what is this", "purpose", "kis liye"],
+    reply: "IshaaraBol un logon ke liye bana hai jo bol nahi sakte — camera se unke hand signs aur head gestures padh kar, unki taraf se awaaz mein bol deta hai. Sab kuch aapke browser mein hi chalta hai, video kahin bhi bheja nahi jaata."
+  },
+  {
+    keys: ["internet", "offline", "model download"],
+    reply: "Pehli baar chalane par internet chahiye taake AI models (~15MB) download ho sakein Google MediaPipe se. Uske baad wo cache ho jaate hain aur baar baar download nahi hote."
+  },
+];
+
+const FALLBACK_REPLY = "Mujhe iska exact jawab nahi pata, lekin ye try karein:\n• Upar diye gaye quick buttons dabayein, ya\n• 'camera', 'sensitivity', 'sab gestures', ya 'awaaz' jaise keywords se poochein.\nAap README.md file bhi dekh sakte hain — usme sab kuch detail mein likha hai.";
+
+function getAssistReply(text) {
+  const lower = text.toLowerCase();
+  for (const rule of ASSIST_RULES) {
+    if (rule.keys.some(k => lower.includes(k))) return rule.reply;
+  }
+  return FALLBACK_REPLY;
+}
+
+async function sendAssistMessage(overrideText) {
+  const text = (overrideText !== undefined ? overrideText : assistInput.value).trim();
+  if (!text) return;
+  addMsg(text, "user");
+  if (overrideText === undefined) assistInput.value = "";
+
+  const thinkingEl = addMsg("…", "bot system");
+  try {
+    const reply = await askAssistant(text);
+    thinkingEl.textContent = reply;
+    thinkingEl.className = "msg bot";
+  } catch (err) {
+    console.warn("Fireworks assistant unavailable, using offline reply:", err);
+    // Show the real reason (not just in devtools) so it's easy to diagnose,
+    // then still answer with the offline rule-based reply underneath.
+    thinkingEl.textContent = `The AI service could not answer right now (${err.message}). Using the built-in offline help instead:\n\n` + getAssistReply(text);
+    thinkingEl.className = "msg bot";
+  }
+}
+
+async function testAssistantConnection() {
+  const thinkingEl = addMsg("🔌 Testing connection to Fireworks AI…", "bot system");
+  try {
+    const res = await fetch("/api/assistant/health");
+    const data = await res.json();
+    if (data.ok) {
+      thinkingEl.textContent = `✅ Connected! Fireworks replied: "${data.reply}"`;
+    } else {
+      thinkingEl.textContent = `❌ Not connected — ${data.error}\n\nCheck: is server.py running? Is FIREWORKS_API_KEY valid? Is there internet?`;
+    }
+  } catch (err) {
+    thinkingEl.textContent = `❌ Could not reach the local server (${err.message}). Is server.py running? (Live Server extension mode doesn't have this endpoint — use "python server.py" instead.)`;
+  }
+  thinkingEl.className = "msg bot";
+}
+
+assistSendBtn?.addEventListener("click", () => sendAssistMessage());
+assistInput?.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendAssistMessage();
+  }
+});
+assistChips?.addEventListener("click", (e) => {
+  const btn = e.target.closest(".chip");
+  if (!btn) return;
+  if (btn.dataset.testconn) { testAssistantConnection(); return; }
+  sendAssistMessage(btn.dataset.q);
+});
+
+startBtn?.addEventListener("click", async () => {
+  if (!startBtn) return;
+  startBtn.disabled = true;
+  startBtn.textContent = "Starting…";
+  try {
+    await setup();
+    startBtn.textContent = "Running";
+  } catch (err) {
+    console.error(err);
+    let hint = err && err.message ? err.message : String(err);
+    if (err && err.name === "NotAllowedError") {
+      hint = "Camera permission allow nahi hui — browser ke address bar mein camera icon se Allow karein.";
+    } else if (err && err.name === "NotFoundError") {
+      hint = "Koi camera nahi mila — laptop/webcam connect hai ya nahi check karein.";
+    } else if (err && err.name === "NotReadableError") {
+      hint = "Camera kisi doosri app (Zoom/Teams/OBS) mein khula hai — usse band karke dubara try karein.";
+    } else if (location.protocol === "file:") {
+      hint = "Ye file:// se khuli hui hai — camera sirf http://localhost par kaam karta hai. server.py chalayein ya Live Server use karein.";
+    }
+    statusText.textContent = "⚠️ " + hint;
+    startBtn.disabled = false;
+    startBtn.textContent = "▶ Start Camera";
+  }
+});
+</script>
+</body>
+</html>
